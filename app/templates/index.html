@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Course Management</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-3xl font-bold mb-8 text-center text-gray-800">
+        Course Management System
+      </h1>
+
+      <!-- Add Course Form -->
+      <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+        <h2 class="text-xl font-semibold mb-4">Add New Course</h2>
+        <div
+          id="errorMessage"
+          class="hidden mb-4 p-4 bg-red-100 text-red-700 rounded-md"
+        ></div>
+        <form id="courseForm" class="space-y-4" enctype="multipart/form-data">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700"
+                >Course Code</label
+              >
+              <input
+                type="text"
+                name="course_code"
+                required
+                placeholder="e.g., CSCI3130"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700"
+                >Course Number</label
+              >
+              <input
+                type="text"
+                name="course_number"
+                required
+                placeholder="e.g., Software Engineering"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700"
+                >Professor</label
+              >
+              <input
+                type="text"
+                name="professor"
+                required
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700"
+                >Credit Hours</label
+              >
+              <input
+                type="number"
+                name="credit_hours"
+                required
+                min="1"
+                max="6"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700"
+              >Description</label
+            >
+            <textarea
+              name="description"
+              required
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+            ></textarea>
+          </div>
+          <button
+            type="submit"
+            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+          >
+            Add Course
+          </button>
+        </form>
+      </div>
+
+      <!-- Search -->
+      <div class="mb-8">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search courses..."
+          class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+        />
+      </div>
+
+      <!-- Course List -->
+      <div class="bg-white rounded-lg shadow-md">
+        <div class="p-6">
+          <h2 class="text-xl font-semibold mb-4">Courses</h2>
+          <div id="courseList" class="space-y-4">
+            {% for course in courses %}
+            <div class="border p-4 rounded-lg">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-semibold">
+                    {{ course.course_code }} - {{ course.course_number }}
+                  </h3>
+                  <p class="text-gray-600">{{ course.description }}</p>
+                  <div class="mt-2 text-sm text-gray-500">
+                    <span>Professor: {{ course.professor }}</span>
+                    <span class="ml-4">Credits: {{ course.credit_hours }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Function to show error message
+      function showError(message) {
+        const errorDiv = document.getElementById("errorMessage");
+        errorDiv.textContent = message;
+        errorDiv.classList.remove("hidden");
+        setTimeout(() => {
+          errorDiv.classList.add("hidden");
+        }, 5000);
+      }
+
+      document
+        .getElementById("courseForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const formData = new FormData(form);
+
+          try {
+            const response = await fetch("/add_course", {
+              method: "POST",
+              body: formData,
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+              window.location.reload();
+            } else {
+              console.error("Server error:", data);
+              showError(
+                data.detail ||
+                  "Error adding course. Please check all fields and try again."
+              );
+            }
+          } catch (error) {
+            console.error("Error:", error);
+            showError("Network error. Please try again.");
+          }
+        });
+
+      let timeoutId;
+      const searchInput = document.getElementById("searchInput");
+      const courseList = document.getElementById("courseList");
+      const noResultsMessage =
+        '<div class="text-gray-500 text-center py-4">No courses found</div>';
+
+      async function performSearch(query) {
+        try {
+          const response = await fetch(
+            `/search?q=${encodeURIComponent(query)}`
+          );
+          if (!response.ok) {
+            throw new Error("Search failed");
+          }
+
+          const courses = await response.json();
+
+          if (courses.length === 0) {
+            courseList.innerHTML = noResultsMessage;
+            return;
+          }
+
+          courseList.innerHTML = courses
+            .map(
+              (course) => `
+                <div class="border p-4 rounded-lg hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-semibold">
+                                <span class="text-indigo-600">${course.course_code}</span> - ${course.course_number}
+                            </h3>
+                            <p class="text-gray-600 mt-1">${course.description}</p>
+                            <div class="mt-2 text-sm text-gray-500">
+                                <span>Professor: ${course.professor}</span>
+                                <span class="ml-4">Credits: ${course.credit_hours}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+              `
+            )
+            .join("");
+        } catch (error) {
+          console.error("Search error:", error);
+          showError("Failed to search courses. Please try again.");
+        }
+      }
+
+      searchInput.addEventListener("input", (e) => {
+        clearTimeout(timeoutId);
+        const query = e.target.value.trim();
+
+        // Show loading state
+        if (query) {
+          courseList.innerHTML =
+            '<div class="text-gray-500 text-center py-4">Searching...</div>';
+        }
+
+        timeoutId = setTimeout(() => performSearch(query), 300);
+      });
+    </script>
+  </body>
+</html>
