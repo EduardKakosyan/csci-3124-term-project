@@ -85,23 +85,49 @@
               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
             ></textarea>
           </div>
-          <button
-            type="submit"
-            class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-          >
-            Add Course
-          </button>
+          <div>
+            <label class="block text-sm font-medium text-gray-700"
+              >Syllabus (PDF, DOC, DOCX)</label
+            >
+            <input
+              type="file"
+              name="syllabus"
+              accept=".pdf,.doc,.docx"
+              class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+            />
+          </div>
+          <div class="flex space-x-4">
+            <button
+              type="submit"
+              class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              Add Course
+            </button>
+            <button
+              type="button"
+              id="clearFormBtn"
+              class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600"
+            >
+              Clear Form
+            </button>
+          </div>
         </form>
       </div>
 
       <!-- Search -->
-      <div class="mb-8">
+      <div class="mb-8 relative">
         <input
           type="text"
           id="searchInput"
           placeholder="Search courses..."
-          class="w-full p-2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          class="w-full p-2 pr-10 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         />
+        <button
+          id="clearSearchBtn"
+          class="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden"
+        >
+          ✕
+        </button>
       </div>
 
       <!-- Course List -->
@@ -120,6 +146,17 @@
                   <div class="mt-2 text-sm text-gray-500">
                     <span>Professor: {{ course.professor }}</span>
                     <span class="ml-4">Credits: {{ course.credit_hours }}</span>
+                    {% if course.syllabus_url %}
+                    <div class="mt-1">
+                      <a
+                        href="{{ course.syllabus_url }}"
+                        target="_blank"
+                        class="text-indigo-600 hover:text-indigo-800"
+                      >
+                        📄 {{ course.syllabus_filename }}
+                      </a>
+                    </div>
+                    {% endif %}
                   </div>
                 </div>
               </div>
@@ -141,6 +178,25 @@
         }, 5000);
       }
 
+      // Function to show success message
+      function showSuccess(message) {
+        const successDiv = document.createElement("div");
+        successDiv.className =
+          "mb-4 p-4 bg-green-100 text-green-700 rounded-md";
+        successDiv.textContent = message;
+        const form = document.getElementById("courseForm");
+        form.parentNode.insertBefore(successDiv, form);
+        setTimeout(() => {
+          successDiv.remove();
+        }, 5000);
+      }
+
+      // Clear form functionality
+      document.getElementById("clearFormBtn").addEventListener("click", () => {
+        const form = document.getElementById("courseForm");
+        form.reset();
+      });
+
       document
         .getElementById("courseForm")
         .addEventListener("submit", async (e) => {
@@ -157,7 +213,16 @@
             const data = await response.json();
 
             if (response.ok) {
-              window.location.reload();
+              // Reset form fields
+              form.reset();
+
+              // Show success message
+              showSuccess("Course added successfully!");
+
+              // Reload the course list after a short delay
+              setTimeout(() => {
+                window.location.reload();
+              }, 1000);
             } else {
               console.error("Server error:", data);
               showError(
@@ -173,9 +238,17 @@
 
       let timeoutId;
       const searchInput = document.getElementById("searchInput");
+      const clearSearchBtn = document.getElementById("clearSearchBtn");
       const courseList = document.getElementById("courseList");
       const noResultsMessage =
         '<div class="text-gray-500 text-center py-4">No courses found</div>';
+
+      // Clear search functionality
+      clearSearchBtn.addEventListener("click", () => {
+        searchInput.value = "";
+        clearSearchBtn.classList.add("hidden");
+        performSearch("");
+      });
 
       async function performSearch(query) {
         try {
@@ -200,12 +273,30 @@
                     <div class="flex justify-between items-start">
                         <div>
                             <h3 class="font-semibold">
-                                <span class="text-indigo-600">${course.course_code}</span> - ${course.course_number}
+                                <span class="text-indigo-600">${
+                                  course.course_code
+                                }</span> - ${course.course_number}
                             </h3>
-                            <p class="text-gray-600 mt-1">${course.description}</p>
+                            <p class="text-gray-600 mt-1">${
+                              course.description
+                            }</p>
                             <div class="mt-2 text-sm text-gray-500">
                                 <span>Professor: ${course.professor}</span>
-                                <span class="ml-4">Credits: ${course.credit_hours}</span>
+                                <span class="ml-4">Credits: ${
+                                  course.credit_hours
+                                }</span>
+                                ${
+                                  course.syllabus_key &&
+                                  course.syllabus_filename
+                                    ? `<div class="mt-1">
+                                    <a href="${course.syllabus_url}" 
+                                       target="_blank" 
+                                       class="text-indigo-600 hover:text-indigo-800">
+                                       📄 ${course.syllabus_filename}
+                                    </a>
+                                   </div>`
+                                    : ""
+                                }
                             </div>
                         </div>
                     </div>
@@ -223,10 +314,13 @@
         clearTimeout(timeoutId);
         const query = e.target.value.trim();
 
-        // Show loading state
+        // Toggle clear button visibility
         if (query) {
+          clearSearchBtn.classList.remove("hidden");
           courseList.innerHTML =
             '<div class="text-gray-500 text-center py-4">Searching...</div>';
+        } else {
+          clearSearchBtn.classList.add("hidden");
         }
 
         timeoutId = setTimeout(() => performSearch(query), 300);

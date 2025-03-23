@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, constr
+from typing import Optional
 
 
 class Course(BaseModel):
@@ -15,3 +16,12 @@ class Course(BaseModel):
         ..., description="Professor name"
     )
     credit_hours: int = Field(..., ge=1, le=6, description="Number of credit hours")
+    syllabus_key: Optional[str] = Field(
+        None, description="S3 object key for the syllabus file"
+    )
+    syllabus_filename: Optional[str] = Field(
+        None, description="Original filename of the syllabus"
+    )
+    syllabus_url: Optional[str] = Field(
+        None, description="Presigned URL for the syllabus file"
+    )

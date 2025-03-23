@@ -4,6 +4,7 @@ import logging
 from dotenv import load_dotenv
 from typing import List, Optional
 from ..models.course import Course
+from .s3 import refresh_presigned_url
 
 # Configure logging levels for boto3 and related libraries
 logging.getLogger("boto3").setLevel(logging.WARNING)
@@ -54,19 +55,21 @@ async def save_course(course: Course) -> bool:
     """Save a course to DynamoDB."""
     try:
         table = get_table()
-        table.put_item(
-            Item={
-                "course_code": course.course_code,
-                "course_number": course.course_number,
-                "description": course.description,
-                "professor": course.professor,
-                "credit_hours": course.credit_hours,
-                # Add lowercase versions for case-insensitive search
-                "course_code_lower": course.course_code.lower(),
-                "course_number_lower": course.course_number.lower(),
-                "professor_lower": course.professor.lower(),
-            }
-        )
+        item = {
+            "course_code": course.course_code,
+            "course_number": course.course_number,
+            "description": course.description,
+            "professor": course.professor,
+            "credit_hours": course.credit_hours,
+            "course_code_lower": course.course_code.lower(),
+        }
+
+        # Add file information if present
+        if course.syllabus_key:
+            item["syllabus_key"] = course.syllabus_key
+            item["syllabus_filename"] = course.syllabus_filename
+
+        table.put_item(Item=item)
         return True
     except Exception as e:
         print(f"Error saving course: {str(e)}")
@@ -80,15 +83,23 @@ async def get_all_courses() -> List[Course]:
         response = table.scan()
         courses = []
         for item in response.get("Items", []):
-            courses.append(
-                Course(
-                    course_code=item["course_code"],
-                    course_number=item["course_number"],
-                    description=item["description"],
-                    professor=item["professor"],
-                    credit_hours=item["credit_hours"],
+            course_data = {
+                "course_code": item["course_code"],
+                "course_number": item["course_number"],
+                "description": item["description"],
+                "professor": item["professor"],
+                "credit_hours": item["credit_hours"],
+            }
+
+            # Add file information and generate fresh presigned URL if needed
+            if "syllabus_key" in item:
+                course_data["syllabus_key"] = item["syllabus_key"]
+                course_data["syllabus_filename"] = item["syllabus_filename"]
+                course_data["syllabus_url"] = refresh_presigned_url(
+                    item["syllabus_key"]
                 )
-            )
+
+            courses.append(Course(**course_data))
         return courses
     except Exception as e:
         print(f"Error getting courses: {str(e)}")
@@ -112,15 +123,23 @@ async def search_courses(query: str) -> List[Course]:
 
         courses = []
         for item in response.get("Items", []):
-            courses.append(
-                Course(
-                    course_code=item["course_code"],
-                    course_number=item["course_number"],
-                    description=item["description"],
-                    professor=item["professor"],
-                    credit_hours=item["credit_hours"],
+            course_data = {
+                "course_code": item["course_code"],
+                "course_number": item["course_number"],
+                "description": item["description"],
+                "professor": item["professor"],
+                "credit_hours": item["credit_hours"],
+            }
+
+            # Add file information and generate fresh presigned URL if needed
+            if "syllabus_key" in item:
+                course_data["syllabus_key"] = item["syllabus_key"]
+                course_data["syllabus_filename"] = item["syllabus_filename"]
+                course_data["syllabus_url"] = refresh_presigned_url(
+                    item["syllabus_key"]
                 )
-            )
+
+            courses.append(Course(**course_data))
         return courses
 
     except Exception as e:
